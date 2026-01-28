@@ -1,0 +1,46 @@
+const gplay = require('google-play-scraper');
+
+async function PlayStore(search) {
+  const apps = await gplay.search({ term: search, num: 5 });
+  return apps.map(app => ({
+    title: app.title,
+    link: app.url,
+    developer: app.developer,
+    img: app.icon,
+    link_dev: `https://play.google.com/store/apps/developer?id=${encodeURIComponent(app.developer)}`,
+    rating: app.score,
+    ratingText: app.scoreText
+  }));
+}
+
+module.exports = {
+  name: "Playstore Search",
+  desc: "Search apk playstore",
+  category: "Search",
+  path: "/search/playstore?apikey=&q=",
+  async run(req, res) {
+    const { apikey, q } = req.query;
+
+    // validasi apikey
+    if (!apikey || !global.apikey.includes(apikey)) {
+      return res.json({ status: false, error: "Apikey invalid" });
+    }
+
+    // validasi query
+    if (!q) {
+      return res.json({ status: false, error: "Query is required" });
+    }
+
+    try {
+      const result = await PlayStore(q);
+      if (!result.length) return res.json({ status: false, error: "No results found" });
+
+      res.json({
+        status: true,
+        result
+      });
+    } catch (error) {
+      res.status(500).json({ status: false, error: error.message });
+    }
+  }
+};

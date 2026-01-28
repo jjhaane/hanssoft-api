@@ -1,0 +1,218 @@
+const fetch = (...args) => import('node-fetch').then(({ default: fetch }) => fetch(...args));
+const FormData = require('form-data');
+const axios = require('axios');
+const path = require('path');
+
+async function getBuffer(url) {
+  const res = await axios.get(url, { responseType: 'arraybuffer' });
+  return Buffer.from(res.data);
+}
+
+async function colorifyAI(buffer, Ghibli = false, filename = "image.jpg") {
+  // === Upload Image ===
+  const form1 = new FormData();
+  form1.append('file', buffer, filename);
+  form1.append('fn_name', 'demo-auto-coloring');
+  form1.append('request_from', '10');
+  form1.append('origin_from', '6d3782f244d64cf8');
+
+  const options1 = {
+    method: 'POST',
+    headers: {
+      ...form1.getHeaders(),
+      'User-Agent': 'Mozilla/5.0 (Linux; Android 15; 23124RA7EO Build/AQ3A.240829.003) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.7444.174 Mobile Safari/537.36',
+      'Accept': 'application/json, text/plain, */*',
+      'Accept-Encoding': 'gzip, deflate, br, zstd',
+      'sec-ch-ua-platform': '"Android"',
+      'fp1': 'Is/V5PrxQ+kZysrA+oYIWtL/YqzH3QJVDe2flEp6WfTPUjOf26DS9apiV35gPt3W',
+      'sec-ch-ua': '"Chromium";v="142", "Android WebView";v="142", "Not_A Brand";v="99"',
+      'x-code': '1765562697430',
+      'x-guide': 'iHyHgYEw7JABN6uKisDbU5twYj+1o3A6ONgSQ225EYhLwFG7lf/26S2MJLqqaGXSI9uRpApIlKxKBuWsWkYLEe2b8up8xipx517eDf6B8bVGrs3DUjSvSOSJho1wRPqC9qjxZL+zlAw6dNrlt/kpW95l7yyhf1rCsf8KYLv01i4=',
+      'sec-ch-ua-mobile': '?1',
+      'theme-version': '83EmcUoQTUv50LhNx0VrdcK8rcGexcP35FcZDcpgWsAXEyO4xqL5shCY6sFIWB2Q',
+      'fp': '06201dce11911be3dfd4375bd4fa1903',
+      'origin': 'https://colorifyai.art',
+      'x-requested-with': 'mark.via.gp',
+      'sec-fetch-site': 'same-site',
+      'sec-fetch-mode': 'cors',
+      'sec-fetch-dest': 'empty',
+      'referer': 'https://colorifyai.art/',
+      'accept-language': 'id-ID,id;q=0.9,en-US;q=0.8,en;q=0.7',
+      'priority': 'u=1, i'
+    },
+    body: form1
+  };
+
+  const uploadRes = await fetch('https://api.colorifyai.art/aitools/upload-img', options1)
+    .then(r => r.json());
+
+  if (!uploadRes?.data?.path) throw new Error("Gagal upload image");
+  let lora = Ghibli ? ["ghibli_style_offset:0.8"] : []
+
+  // === Create Task ===
+  const data2 = JSON.stringify({
+    "fn_name": "demo-auto-coloring",
+    "call_type": 3,
+    "input": {
+      "source_image": uploadRes.data.path,
+      "prompt": "(masterpiece), best quality",
+      "request_from": 10,
+       "lora": lora
+    },
+    "request_from": 10,
+    "origin_from": "6d3782f244d64cf8"
+  });
+
+  const options2 = {
+    method: 'POST',
+    headers: {
+      'User-Agent': 'Mozilla/5.0 (Linux; Android 15; 23124RA7EO Build/AQ3A.240829.003) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.7444.174 Mobile Safari/537.36',
+      'Accept': 'application/json, text/plain, */*',
+      'Accept-Encoding': 'gzip, deflate, br, zstd',
+      'Content-Type': 'application/json',
+      'sec-ch-ua-platform': '"Android"',
+      'fp1': 'DXIsVZgaBMS6NEh/sWJ6+hW3cffryH1g/D34GG3cAmtSty2IJeA9mFt1jWWfPzO1',
+      'sec-ch-ua': '"Chromium";v="142", "Android WebView";v="142", "Not_A Brand";v="99"',
+      'x-code': '1765562700636',
+      'x-guide': 'WKQ8gFtYbQmzcW5QjSIwNOYreZ67lhAO6LhbCNHr2dxqQh+fItDgw6sI7Ro7mWaYqFE4BBiR8C2/60VrO2nsKR9hHDvRJivELmf9YeiAQjgBqW8O1tI6Ooe+yExtVKWoMyyrV9Fb7B/vQ8OelDRDdU54ouQqIIq1EN4yacVc5+g=',
+      'sec-ch-ua-mobile': '?1',
+      'theme-version': '83EmcUoQTUv50LhNx0VrdcK8rcGexcP35FcZDcpgWsAXEyO4xqL5shCY6sFIWB2Q',
+      'fp': '06201dce11911be3dfd4375bd4fa1903',
+      'origin': 'https://colorifyai.art',
+      'x-requested-with': 'mark.via.gp',
+      'sec-fetch-site': 'same-site',
+      'sec-fetch-mode': 'cors',
+      'sec-fetch-dest': 'empty',
+      'referer': 'https://colorifyai.art/',
+      'accept-language': 'id-ID,id;q=0.9,en-US;q=0.8,en;q=0.7',
+      'priority': 'u=1, i'
+    },
+    body: data2
+  };
+
+  const createTask = await fetch('https://api.colorifyai.art/aitools/of/create', options2)
+    .then(r => r.json());
+
+  if (!createTask?.data?.task_id) throw new Error("Gagal membuat task");
+
+  // === Check Status Task ===
+  const taskData = JSON.stringify({
+    "task_id": createTask.data.task_id,
+    "fn_name": "demo-auto-coloring",
+    "call_type": 3,
+    "consume_type": 0,
+    "request_from": 10,
+    "origin_from": "6d3782f244d64cf8"
+  });
+
+  const options3 = {
+    method: 'POST',
+    headers: {
+      'User-Agent': 'Mozilla/5.0 (Linux; Android 15; 23124RA7EO Build/AQ3A.240829.003) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.7444.174 Mobile Safari/537.36',
+      'Accept': 'application/json, text/plain, */*',
+      'Accept-Encoding': 'gzip, deflate, br, zstd',
+      'Content-Type': 'application/json',
+      'sec-ch-ua-platform': '"Android"',
+      'fp1': '/6xrrP0Hk5TY3a1SNrqxOkO2jWZ8/X1UaxPAp+WmbjuZDfuz+BERZg93Xs3M/Gkp',
+      'sec-ch-ua': '"Chromium";v="142", "Android WebView";v="142", "Not_A Brand";v="99"',
+      'x-code': '1765562710156',
+      'x-guide': 'TgqySUbQeR0KxECY98KUsb4pcHQXQoDk6h7pkpzb6z7vaDMkT1WzYVy92RNfIXQrU4tbP9lNRMmeipQhG4MUUx2SVWHxpIdj5QI7PPYAzDL8c0xJ6mPx9tZSMaaecjFDJ+wnZBzmtjbwIfvLTfek+nzbkBZAq44K0U/GpSesKi8=',
+      'sec-ch-ua-mobile': '?1',
+      'theme-version': '83EmcUoQTUv50LhNx0VrdcK8rcGexcP35FcZDcpgWsAXEyO4xqL5shCY6sFIWB2Q',
+      'fp': '06201dce11911be3dfd4375bd4fa1903',
+      'origin': 'https://colorifyai.art',
+      'x-requested-with': 'mark.via.gp',
+      'sec-fetch-site': 'same-site',
+      'sec-fetch-mode': 'cors',
+      'sec-fetch-dest': 'empty',
+      'referer': 'https://colorifyai.art/',
+      'accept-language': 'id-ID,id;q=0.9,en-US;q=0.8,en;q=0.7',
+      'priority': 'u=1, i'
+    },
+    body: taskData
+  };
+
+  let result;
+  while (true) {
+    result = await fetch('https://api.colorifyai.art/aitools/of/check-status', options3)
+      .then(r => r.json());
+
+    if (result?.data?.result_image) break;
+    await new Promise(r => setTimeout(r, 2000));
+  }
+
+  // Ambil buffer hasil image
+  const finalImageUrl = `https://temp.colorifyai.art/${result.data.result_image}`;
+  const finalBuffer = await getBuffer(finalImageUrl);
+  return finalBuffer;
+}
+
+// === Endpoint Express.js ===
+module.exports = [
+{
+  name: "Jadi Anime",
+  desc: "Convert to Anime Style",
+  category: "Tools",
+  path: "/tools/jadianime?apikey=&url=",
+
+  async run(req, res) {
+    const { url, apikey } = req.query;
+
+    if (!apikey || !global.apikey.includes(apikey)) {
+      return res.json({ status: false, error: "Apikey invalid" });
+    }
+
+    if (!url) {
+      return res.json({ status: false, error: "Masukkan url image" });
+    }
+
+    try {
+      const buffer = await getBuffer(url);
+      const image = await colorifyAI(buffer, false, path.basename(url));
+
+      // Kirim image PNG langsung
+      res.writeHead(200, {
+        "Content-Type": "image/png",
+        "Content-Length": image.length
+      });
+      return res.end(image);
+
+    } catch (e) {
+      return res.status(500).json({ status: false, error: e.message });
+    }
+  }
+}, 
+{
+  name: "To Ghibli",
+  desc: "Convert to Ghibli Style",
+  category: "Tools",
+  path: "/tools/toghibli?apikey=&url=",
+
+  async run(req, res) {
+    const { url, apikey } = req.query;
+
+    if (!apikey || !global.apikey.includes(apikey)) {
+      return res.json({ status: false, error: "Apikey invalid" });
+    }
+
+    if (!url) {
+      return res.json({ status: false, error: "Masukkan url image" });
+    }
+
+    try {
+      const buffer = await getBuffer(url);
+      const image = await colorifyAI(buffer, true, path.basename(url));
+
+      // Kirim image PNG langsung
+      res.writeHead(200, {
+        "Content-Type": "image/png",
+        "Content-Length": image.length
+      });
+      return res.end(image);
+
+    } catch (e) {
+      return res.status(500).json({ status: false, error: e.message });
+    }
+  }
+}
+]
