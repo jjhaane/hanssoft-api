@@ -54,7 +54,7 @@ module.exports = {
         return res.json({ status: false, error: "Url is required" });
 
       try {
-        const results = await AllInOneDownloader(url);
+        const results = await download(url);
         res.status(200).json({
           status: true,
           result: results,
@@ -65,3 +65,4 @@ module.exports = {
     }
 
 }
+
